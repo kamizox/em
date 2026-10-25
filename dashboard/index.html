@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="ur">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mail Tracker — Dashboard</title>
+  <style>
+    :root {
+      --g:#1e8e3e; --blue:#1a73e8; --grey:#5f6368; --line:#e8eaed;
+      --bg:#f6f8fc; --card:#fff; --red:#d93025; --text:#202124;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root { --bg:#17181c; --card:#202124; --line:#3c4043; --text:#e8eaed; --grey:#9aa0a6; }
+    }
+    * { box-sizing:border-box; }
+    body { margin:0; font:14px/1.6 'Segoe UI', Roboto, Arial, sans-serif; background:var(--bg); color:var(--text); }
+    header { background:var(--card); border-bottom:1px solid var(--line); padding:16px 28px; display:flex; align-items:center; justify-content:space-between; }
+    header h1 { font-size:18px; margin:0; display:flex; align-items:center; gap:10px; }
+    header .ticks { color:var(--g); font-weight:800; letter-spacing:-3px; font-size:22px; }
+    header .refresh { font-size:13px; color:var(--grey); cursor:pointer; background:none; border:1px solid var(--line); padding:6px 14px; border-radius:20px; }
+    .wrap { max-width:1000px; margin:0 auto; padding:24px 20px 60px; }
+
+    .cards { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:14px; margin-bottom:24px; }
+    .card { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:18px 20px; }
+    .card .n { font-size:30px; font-weight:700; }
+    .card .l { font-size:12px; color:var(--grey); text-transform:uppercase; letter-spacing:.5px; }
+    .card.g .n { color:var(--g); } .card.b .n { color:var(--blue); } .card.r .n { color:var(--red); }
+
+    .toolbar { display:flex; gap:10px; margin-bottom:14px; align-items:center; flex-wrap:wrap; }
+    .toolbar input { flex:1; min-width:180px; padding:9px 14px; border:1px solid var(--line); border-radius:10px; background:var(--card); color:var(--text); font-size:14px; }
+    .toolbar select { padding:9px 12px; border:1px solid var(--line); border-radius:10px; background:var(--card); color:var(--text); }
+
+    table { width:100%; border-collapse:collapse; background:var(--card); border:1px solid var(--line); border-radius:14px; overflow:hidden; }
+    th, td { text-align:left; padding:13px 16px; border-bottom:1px solid var(--line); }
+    th { font-size:11px; text-transform:uppercase; letter-spacing:.5px; color:var(--grey); background:transparent; }
+    tr:last-child td { border-bottom:none; }
+    tr.email-row { cursor:pointer; }
+    tr.email-row:hover { background:rgba(128,128,128,.06); }
+    .subj { font-weight:600; max-width:280px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .recip { font-size:12px; color:var(--grey); }
+    .status { font-weight:700; white-space:nowrap; }
+    .st-open { color:var(--g); } .st-sent { color:var(--grey); } .st-bounce { color:var(--red); }
+    .detail { background:rgba(128,128,128,.04); }
+    .detail td { padding:0; }
+    .detail-inner { padding:16px 24px; }
+    .tl { margin:0; padding:0; list-style:none; }
+    .tl li { padding:6px 0; font-size:13px; border-left:2px solid var(--line); padding-left:14px; margin-left:4px; position:relative; }
+    .tl li::before { content:''; position:absolute; left:-5px; top:12px; width:8px; height:8px; border-radius:50%; background:var(--g); }
+    .tl li.click::before { background:var(--blue); }
+    .tl li.proxy::before { background:#9aa0a6; }
+    .empty { text-align:center; padding:50px; color:var(--grey); }
+    .badge-proxy { font-size:10px; background:#f1f3f4; color:#5f6368; padding:1px 6px; border-radius:6px; margin-left:6px; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1><span class="ticks">✓✓</span> Mail Tracker Dashboard</h1>
+    <button class="refresh" id="refresh">↻ Refresh</button>
+  </header>
+
+  <div class="wrap">
+    <div class="cards">
+      <div class="card b"><div class="n" id="c-sent">0</div><div class="l">Bheji gayi</div></div>
+      <div class="card g"><div class="n" id="c-open">0</div><div class="l">Kholi gayi</div></div>
+      <div class="card"><div class="n" id="c-rate">0%</div><div class="l">Open rate</div></div>
+      <div class="card b"><div class="n" id="c-click">0</div><div class="l">Clicked</div></div>
+      <div class="card r"><div class="n" id="c-bounce">0</div><div class="l">Bounced</div></div>
+    </div>
+
+    <div class="toolbar">
+      <input type="text" id="search" placeholder="🔍 subject, sender ya recipient se dhoondo…" />
+      <select id="sender"><option value="">Sab accounts</option></select>
+      <select id="filter">
+        <option value="all">Sab</option>
+        <option value="opened">Sirf kholi gayi</option>
+        <option value="unopened">Nahi kholi</option>
+        <option value="clicked">Click hui</option>
+        <option value="bounced">Bounced</option>
+      </select>
+    </div>
+
+    <table>
+      <thead>
+        <tr><th>Subject</th><th>From (kis se)</th><th>To (kisko)</th><th>Status</th><th>Opens</th><th>Clicks</th><th>Bheji</th></tr>
+      </thead>
+      <tbody id="tbody">
+        <tr><td colspan="7" class="empty">Load ho raha hai…</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- absolute path: /dashboard (bina slash) par relative src /dashboard.js ban jata tha -->
+  <script src="/dashboard/dashboard.js"></script>
+</body>
+</html>

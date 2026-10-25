@@ -1,0 +1,15 @@
+{
+  "name": "email-tracker-backend",
+  "version": "1.0.0",
+  "description": "Self-hosted email open & click tracker. ZERO npm dependencies — sirf Node.js built-in modules (http + node:sqlite). Node 22+ chahiye.",
+  "main": "server.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node --no-warnings server.js",
+    "dev": "node --no-warnings --watch server.js"
+  },
+  "engines": {
+    "node": ">=22.5.0"
+  },
+  "license": "MIT"
+}

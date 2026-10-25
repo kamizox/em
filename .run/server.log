@@ -1,0 +1,5 @@
+
+  Email Tracker backend -> http://localhost:3000
+  Dashboard             -> http://localhost:3000/dashboard
+  Pixel endpoint        -> http://localhost:3000/p/<id>.png
+

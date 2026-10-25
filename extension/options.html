@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="ur">
+<head>
+  <meta charset="UTF-8" />
+  <title>Mail Tracker — Settings</title>
+  <style>
+    body { font: 14px/1.6 'Segoe UI', Roboto, Arial, sans-serif; max-width: 520px; margin: 40px auto; padding: 0 20px; color:#202124; }
+    h1 { font-size: 20px; display:flex; align-items:center; gap:8px; }
+    .ticks { color:#1e8e3e; font-weight:800; letter-spacing:-2px; }
+    label { display:block; margin: 18px 0 6px; font-weight:600; }
+    input[type=text], input[type=email] { width:100%; padding:10px 12px; border:1px solid #dadce0; border-radius:8px; font-size:14px; }
+    .hint { font-size:12px; color:#5f6368; margin-top:4px; }
+    .check { display:flex; align-items:center; gap:8px; margin-top:16px; }
+    button { margin-top:24px; background:#1a73e8; color:#fff; border:none; padding:10px 20px; border-radius:8px; font-size:14px; cursor:pointer; }
+    button:hover { background:#1765cc; }
+    .saved { color:#1e8e3e; margin-left:12px; font-weight:600; opacity:0; transition:opacity .2s; }
+    .saved.show { opacity:1; }
+    .box { background:#f8f9fa; border:1px solid #e8eaed; border-radius:8px; padding:14px; margin-top:20px; font-size:13px; color:#5f6368; }
+  </style>
+</head>
+<body>
+  <h1><span class="ticks">✓✓</span> My Mail Tracker — Settings</h1>
+
+  <label for="serverUrl">Server URL</label>
+  <input type="text" id="serverUrl" placeholder="http://localhost:3000" />
+  <div class="hint">Yahan hamesha <code>http://localhost:3000</code> rakho. Pixel ka public URL
+    (cloudflare tunnel) extension khud server se le leti hai — tunnel restart ho to yahan kuch
+    badalne ki zaroorat nahi. Backend kahin deploy kiya ho to uska URL daalo.</div>
+
+  <label for="owner">Aapka Gmail (owner tag)</label>
+  <input type="email" id="owner" placeholder="aap@gmail.com" />
+  <div class="hint">Taake dashboard sirf aapki bheji emails dikhaye (optional).</div>
+
+  <div class="check">
+    <input type="checkbox" id="trackDefault" checked />
+    <label for="trackDefault" style="margin:0;font-weight:400;">Naye compose mein tracking by default ON rahe</label>
+  </div>
+  <div class="check">
+    <input type="checkbox" id="notify" checked />
+    <label for="notify" style="margin:0;font-weight:400;">Email khulte hi Chrome notification bhejo</label>
+  </div>
+
+  <div>
+    <button id="save">Save karo</button>
+    <span class="saved" id="saved">✓ Save ho gaya</span>
+  </div>
+
+  <div class="box">
+    <b>Kaise test karein?</b><br>
+    1. Backend chalao: <code>cd backend &amp;&amp; npm install &amp;&amp; npm start</code><br>
+    2. Yahan server URL daalo aur save karo.<br>
+    3. Gmail mein ek email khud ko bhejo (Track ON). 15 sec baad kholo — popup/dashboard mein ✓✓ aa jayega.
+  </div>
+
+  <script src="options.js"></script>
+</body>
+</html>
