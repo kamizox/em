@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ur">
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
   <title>Mail Tracker — Settings</title>
@@ -23,33 +23,33 @@
 
   <label for="serverUrl">Server URL</label>
   <input type="text" id="serverUrl" placeholder="http://localhost:3000" />
-  <div class="hint">Yahan hamesha <code>http://localhost:3000</code> rakho. Pixel ka public URL
-    (cloudflare tunnel) extension khud server se le leti hai — tunnel restart ho to yahan kuch
-    badalne ki zaroorat nahi. Backend kahin deploy kiya ho to uska URL daalo.</div>
+  <div class="hint">Keep this as <code>http://localhost:3000</code>. The extension gets the
+    public pixel URL (cloudflare tunnel) from the server automatically — if the tunnel restarts,
+    nothing needs to change here. If the backend is deployed somewhere, enter that URL.</div>
 
-  <label for="owner">Aapka Gmail (owner tag)</label>
+  <label for="owner">Your Gmail (owner tag)</label>
   <input type="email" id="owner" placeholder="aap@gmail.com" />
-  <div class="hint">Taake dashboard sirf aapki bheji emails dikhaye (optional).</div>
+  <div class="hint">So the dashboard can show only the emails you sent (optional).</div>
 
   <div class="check">
     <input type="checkbox" id="trackDefault" checked />
-    <label for="trackDefault" style="margin:0;font-weight:400;">Naye compose mein tracking by default ON rahe</label>
+    <label for="trackDefault" style="margin:0;font-weight:400;">Keep tracking ON by default in new compose windows</label>
   </div>
   <div class="check">
     <input type="checkbox" id="notify" checked />
-    <label for="notify" style="margin:0;font-weight:400;">Email khulte hi Chrome notification bhejo</label>
+    <label for="notify" style="margin:0;font-weight:400;">Send a Chrome notification as soon as an email is opened</label>
   </div>
 
   <div>
-    <button id="save">Save karo</button>
-    <span class="saved" id="saved">✓ Save ho gaya</span>
+    <button id="save">Save</button>
+    <span class="saved" id="saved">✓ Saved</span>
   </div>
 
   <div class="box">
-    <b>Kaise test karein?</b><br>
-    1. Backend chalao: <code>cd backend &amp;&amp; npm install &amp;&amp; npm start</code><br>
-    2. Yahan server URL daalo aur save karo.<br>
-    3. Gmail mein ek email khud ko bhejo (Track ON). 15 sec baad kholo — popup/dashboard mein ✓✓ aa jayega.
+    <b>How to test?</b><br>
+    1. Run the backend: <code>cd backend &amp;&amp; npm install &amp;&amp; npm start</code><br>
+    2. Enter the server URL here and save.<br>
+    3. In Gmail, send an email to yourself (Track ON). Open it after 15 sec — ✓✓ will appear in the popup/dashboard.
   </div>
 
   <script src="options.js"></script>

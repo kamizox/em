@@ -1,8 +1,8 @@
 /* background.js — service worker
- * Kaam:
- *  - Sent emails ko memory mein rakho (status polling ke liye)
- *  - Har kuch waqt baad server se poll kar ke dekho koi email abhi "open" hui?
- *    agar haan to Chrome notification bhejo.
+ * What it does:
+ *  - Keep sent emails in memory (for status polling)
+ *  - Poll the server periodically to see if any email was just "opened"
+ *    and, if so, send a Chrome notification.
  */
 
 const POLL_ALARM = 'mt-poll';
@@ -14,27 +14,30 @@ chrome.runtime.onStartup.addListener(() => {
   chrome.alarms.create(POLL_ALARM, { periodInMinutes: 1 });
 });
 
-// Server ka base URL (bina trailing slash)
+// Server base URL (without trailing slash)
 async function serverBase() {
   const cfg = await chrome.storage.sync.get(['serverUrl']);
   return (cfg.serverUrl || '').replace(/\/+$/, '');
 }
 
-// Email register karo + local list mein daalo.
-// NOTE: ye call yahan (service worker mein) hoti hai, content script mein nahi.
-// Gmail https page se http://localhost par request Chrome block kar deta hai
-// (CORS + Private Network Access), jab ke service worker ke paas host_permissions hain.
+// Register the email + add it to the local list.
+// NOTE: this call happens here (in the service worker), not in the content script.
+// Chrome blocks a request from the Gmail https page to http://localhost
+// (CORS + Private Network Access), while the service worker has host_permissions.
 async function registerEmail(data) {
   const base = await serverBase();
-  if (!base) return { ok: false, error: 'server URL set nahi hai' };
+  if (!base) return { ok: false, error: 'server URL is not set' };
 
   try {
     const res = await fetch(`${base}/api/register`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: data.id, owner: data.owner || '', subject: data.subject, recipient: data.recipient }),
+      body: JSON.stringify({
+        id: data.id, owner: data.owner || '', subject: data.subject, recipient: data.recipient,
+        scheduled: data.scheduled || 0, tags: data.tags || '', template: data.template || '', remind_days: data.remind_days || 0,
+      }),
     });
-    if (!res.ok) return { ok: false, error: `server ne ${res.status} diya` };
+    if (!res.ok) return { ok: false, error: `server returned ${res.status}` };
   } catch (e) {
     return { ok: false, error: e.message };
   }
@@ -46,8 +49,8 @@ async function registerEmail(data) {
   return { ok: true };
 }
 
-// Server se public URL maango (pixel/link ke liye). Short cache taake har
-// compose par network hit na ho, lekin tunnel badle to jaldi pata chal jaye.
+// Ask the server for the public URL (for pixel/link). A short cache so every
+// compose doesn't hit the network, but a tunnel change is noticed quickly.
 let cfgCache = { at: 0, publicUrl: '' };
 async function fetchConfig() {
   const base = await serverBase();
@@ -76,7 +79,7 @@ async function fetchEmails(limit = 300) {
   }
 }
 
-// content.js se messages
+// messages from content.js
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg.type === 'MT_REGISTER') {
     registerEmail(msg.data).then(sendResponse);
@@ -108,6 +111,32 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   }
   if (msg.type === 'MT_CONFIG') {
     fetchConfig().then(sendResponse);
+    return true;
+  }
+  if (msg.type === 'MT_TEMPLATES') {
+    serverBase().then(async (base) => {
+      if (!base) return sendResponse({ templates: [] });
+      try { sendResponse(await (await fetch(`${base}/api/templates`)).json()); }
+      catch (_) { sendResponse({ templates: [] }); }
+    });
+    return true;
+  }
+  if (msg.type === 'MT_PATCH') {
+    serverBase().then((base) => {
+      if (!base) return sendResponse({ ok: false });
+      fetch(`${base}/api/emails/${encodeURIComponent(msg.id)}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(msg.data || {}),
+      }).then(() => sendResponse({ ok: true })).catch(() => sendResponse({ ok: false }));
+    });
+    return true;
+  }
+  if (msg.type === 'MT_REPLIED') {
+    serverBase().then((base) => {
+      if (!base) return sendResponse({ ok: false });
+      fetch(`${base}/api/replied`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(msg.data || {}),
+      }).then((r) => r.json()).then(sendResponse).catch(() => sendResponse({ ok: false }));
+    });
     return true;
   }
   if (msg.type === 'EMAIL_SENT') {
@@ -142,19 +171,42 @@ async function pollOpens() {
 
   for (const e of emails) {
     const local = sent[e.id];
-    if (!local) continue; // sirf is browser se bheji emails
+    if (!local) continue; // only emails sent from this browser
     if ((e.open_count || 0) > 0 && !local.notifiedOpen) {
-      // pehli dafa open hui — notify!
+      // opened for the first time — notify!
       chrome.notifications.create(`open-${e.id}`, {
         type: 'basic',
         iconUrl: 'icons/icon128.png',
-        title: '📬 Email kholi gayi!',
-        message: `"${(e.subject || '').slice(0, 50)}" ko ${e.recipient || 'recipient'} ne khola.`,
+        title: '📬 Email opened!',
+        message: `"${(e.subject || '').slice(0, 50)}" was opened by ${e.recipient || 'recipient'}.`,
         priority: 2,
       });
       local.notifiedOpen = true;
       changed = true;
     }
   }
+  // replied? (the server can set this from either the extension or dashboard)
+  for (const e of emails) {
+    const local = sent[e.id];
+    if (!local) continue;
+    if (e.replied && !local.notifiedReply) {
+      chrome.notifications.create(`reply-${e.id}`, {
+        type: 'basic', iconUrl: 'icons/icon128.png',
+        title: '↩ Reply received!', message: `"${(e.subject || '').slice(0, 50)}" got a reply.`, priority: 2,
+      });
+      local.notifiedReply = true; changed = true;
+    }
+  }
   if (changed) chrome.storage.local.set({ sent });
+
+  // follow-up reminders — the server returns what's due, we notify
+  try {
+    const due = await (await fetch(`${serverUrl}/api/reminders/due`)).json();
+    (due.emails || []).forEach((e) => {
+      chrome.notifications.create(`remind-${e.id}-${Date.now()}`, {
+        type: 'basic', iconUrl: 'icons/icon128.png',
+        title: '⏰ Follow up', message: `"${(e.subject || '').slice(0, 50)}" has not been opened yet.`, priority: 2,
+      });
+    });
+  } catch (_) {}
 }

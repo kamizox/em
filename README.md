@@ -114,3 +114,39 @@ Ye har pixel-based tracker par laagu hain (Mailtrack samet), koi bhi 100% nahi:
 - Multi-user login (abhi single-user/self-hosted hai).
 
 Banaya **Kamran Alam** ke liye. GitHub: kamizox
+
+---
+
+## ✨ Naye features (v2)
+
+**Dashboard** (`/dashboard`):
+- **Reply tracking** — jab recipient jawab de to "↩ Reply aaya" dikhta hai (card bhi).
+- **Hot lead 🔥** — jo email 3+ dafa khuli us par hot-lead tag.
+- **"Kab kholi" column** + khuli emails halki hari (highlight).
+- **Row click** → usi account ka Gmail khulta hai aur wahi sent email open ho jati hai.
+- **Link-wise clicks** — kaunsa link kitni dafa click hua (▾ detail mein).
+- **Device/location guess** — open computer se tha ya phone se (Gmail proxy par chhupa rehta hai).
+- **Filters** — status, sender account, date (aaj/hafta/mahina), **follow-up** ("X din se nahi kholi").
+- **Tags** — har email par tag/campaign (dashboard se ya compose ke "⚙ More" se).
+- **CSV export** — filtered emails report ke liye.
+- **Analytics tab** — din×ghanta heatmap (best waqt), domain-wise & template-wise open rate, weekly summary.
+- **Log (recipients) tab** — har recipient ki profile: kitni bheji, kholi, reply, history.
+- **Templates tab** — baar baar jaane wali emails save karo (naam + subject + body).
+- **Live update (SSE)** — koi email khule to dashboard foran update + browser notification (🔔 Alerts).
+
+**Extension**:
+- **Compose "⚙ More"** — us email ke liye tags, follow-up reminder (1/2/3/7 din), aur template load.
+- **Sent email kholte hi status bar** — "✓✓ 3 dafa kholi · aakhri 2 ghante pehle · 🔥 Hot lead".
+- **Reply auto-detect** — inbox mein "Re: …" aaye to khud server ko bata deta hai.
+- **Schedule send** bhi track hoti hai (⏱ scheduled tag).
+- **Thread ID capture** — reply matching behtar.
+- **Chrome notifications** — open, reply, aur follow-up reminder par.
+
+**Naye API endpoints**: `/api/opens`, `/api/replied`, `/api/reminders/due`, `/api/templates` (GET/POST/DELETE),
+`/api/events` (SSE live), `PATCH /api/emails/:id` (tags/reminder/reply/thread), `DELETE /api/emails/:id` (sirf localhost).
+
+> DB purani ho to khud migrate ho jati hai (naye columns add) — data nahi khota.
+
+### ⚠️ Deploy se pehle (company ke liye zaroori)
+1. **Dashboard par password/token** — abhi jis ke paas tunnel URL ho wo sari emails dekh sakta hai.
+2. **Backend deploy** (Render/Railway/VPS) — laptop band ya tunnel restart par purani emails ke opens band ho jate hain.

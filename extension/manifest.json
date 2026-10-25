@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "My Mail Tracker",
   "version": "1.0.0",
-  "description": "Apna khud ka email open & click tracker for Gmail. Data sirf aapke apne server par.",
+  "description": "Your own email open & click tracker for Gmail. Data stays only on your own server.",
   "permissions": ["storage", "notifications", "alarms"],
   "host_permissions": [
     "https://mail.google.com/*",

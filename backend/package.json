@@ -1,7 +1,7 @@
 {
   "name": "email-tracker-backend",
   "version": "1.0.0",
-  "description": "Self-hosted email open & click tracker. ZERO npm dependencies — sirf Node.js built-in modules (http + node:sqlite). Node 22+ chahiye.",
+  "description": "Self-hosted email open & click tracker. ZERO npm dependencies — only Node.js built-in modules (http + node:sqlite). Requires Node 22+.",
   "main": "server.js",
   "type": "commonjs",
   "scripts": {

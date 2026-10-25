@@ -1,95 +1,232 @@
 <!DOCTYPE html>
-<html lang="ur">
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
+  <meta name="google" content="notranslate" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Mail Tracker — Dashboard</title>
   <style>
     :root {
       --g:#1e8e3e; --blue:#1a73e8; --grey:#5f6368; --line:#e8eaed;
-      --bg:#f6f8fc; --card:#fff; --red:#d93025; --text:#202124;
+      --bg:#f6f8fc; --card:#fff; --red:#d93025; --text:#202124; --amber:#e37400;
+      --chip:#f1f3f4; --heat:26,115,232; --gsoft:rgba(30,142,62,.06);
     }
     @media (prefers-color-scheme: dark) {
-      :root { --bg:#17181c; --card:#202124; --line:#3c4043; --text:#e8eaed; --grey:#9aa0a6; }
+      :root { --bg:#17181c; --card:#202124; --line:#3c4043; --text:#e8eaed; --grey:#9aa0a6;
+        --chip:#303134; --heat:138,180,248; --gsoft:rgba(129,201,149,.10);
+        --g:#81c995; --blue:#8ab4f8; --red:#f28b82; --amber:#fdd663; }
     }
     * { box-sizing:border-box; }
     body { margin:0; font:14px/1.6 'Segoe UI', Roboto, Arial, sans-serif; background:var(--bg); color:var(--text); }
-    header { background:var(--card); border-bottom:1px solid var(--line); padding:16px 28px; display:flex; align-items:center; justify-content:space-between; }
+    a { color:var(--blue); }
+    header { background:var(--card); border-bottom:1px solid var(--line); padding:14px 28px;
+      display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;
+      position:sticky; top:0; z-index:5; }
     header h1 { font-size:18px; margin:0; display:flex; align-items:center; gap:10px; }
     header .ticks { color:var(--g); font-weight:800; letter-spacing:-3px; font-size:22px; }
-    header .refresh { font-size:13px; color:var(--grey); cursor:pointer; background:none; border:1px solid var(--line); padding:6px 14px; border-radius:20px; }
-    .wrap { max-width:1000px; margin:0 auto; padding:24px 20px 60px; }
+    .hgroup { display:flex; align-items:center; gap:10px; }
+    .live { font-size:12px; color:var(--grey); display:flex; align-items:center; gap:6px; }
+    .live .dot { width:9px; height:9px; border-radius:50%; background:#bbb; }
+    .live.on .dot { background:var(--g); box-shadow:0 0 0 0 rgba(30,142,62,.5); animation:pulse 2s infinite; }
+    @keyframes pulse { 0%{box-shadow:0 0 0 0 rgba(30,142,62,.5);} 70%{box-shadow:0 0 0 7px rgba(30,142,62,0);} 100%{box-shadow:0 0 0 0 rgba(30,142,62,0);} }
+    .btn { font-size:13px; color:var(--grey); cursor:pointer; background:var(--card); border:1px solid var(--line); padding:6px 14px; border-radius:20px; }
+    .btn:hover { border-color:var(--blue); color:var(--blue); }
+    .wrap { max-width:1180px; margin:0 auto; padding:22px 20px 70px; }
 
-    .cards { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:14px; margin-bottom:24px; }
-    .card { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:18px 20px; }
-    .card .n { font-size:30px; font-weight:700; }
-    .card .l { font-size:12px; color:var(--grey); text-transform:uppercase; letter-spacing:.5px; }
-    .card.g .n { color:var(--g); } .card.b .n { color:var(--blue); } .card.r .n { color:var(--red); }
+    .tabs { display:flex; gap:4px; margin-bottom:18px; border-bottom:1px solid var(--line); flex-wrap:wrap; }
+    .tab { padding:9px 16px; cursor:pointer; font-size:14px; color:var(--grey); border-bottom:2px solid transparent; white-space:nowrap; }
+    .tab.active { color:var(--blue); border-bottom-color:var(--blue); font-weight:600; }
+
+    .cards { display:grid; grid-template-columns:repeat(auto-fit,minmax(130px,1fr)); gap:14px; margin-bottom:22px; }
+    .card { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:16px 18px; cursor:pointer; transition:border-color .15s; }
+    .card:hover { border-color:var(--blue); }
+    .card .n { font-size:28px; font-weight:700; }
+    .card .l { font-size:11px; color:var(--grey); text-transform:uppercase; letter-spacing:.5px; }
+    .card.g .n{color:var(--g);} .card.b .n{color:var(--blue);} .card.r .n{color:var(--red);} .card.a .n{color:var(--amber);}
+    .card.active { border-color:var(--blue); box-shadow:0 0 0 1px var(--blue) inset; }
 
     .toolbar { display:flex; gap:10px; margin-bottom:14px; align-items:center; flex-wrap:wrap; }
-    .toolbar input { flex:1; min-width:180px; padding:9px 14px; border:1px solid var(--line); border-radius:10px; background:var(--card); color:var(--text); font-size:14px; }
-    .toolbar select { padding:9px 12px; border:1px solid var(--line); border-radius:10px; background:var(--card); color:var(--text); }
+    .toolbar input, .toolbar select { padding:9px 12px; border:1px solid var(--line); border-radius:10px; background:var(--card); color:var(--text); font-size:14px; }
+    .toolbar input#search { flex:1; min-width:180px; }
 
     table { width:100%; border-collapse:collapse; background:var(--card); border:1px solid var(--line); border-radius:14px; overflow:hidden; }
-    th, td { text-align:left; padding:13px 16px; border-bottom:1px solid var(--line); }
-    th { font-size:11px; text-transform:uppercase; letter-spacing:.5px; color:var(--grey); background:transparent; }
+    th, td { text-align:left; padding:12px 14px; border-bottom:1px solid var(--line); vertical-align:top; }
+    th { font-size:11px; text-transform:uppercase; letter-spacing:.5px; color:var(--grey); background:transparent; white-space:nowrap; }
     tr:last-child td { border-bottom:none; }
     tr.email-row { cursor:pointer; }
     tr.email-row:hover { background:rgba(128,128,128,.06); }
-    .subj { font-weight:600; max-width:280px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    tr.is-open { background:var(--gsoft); }
+    tr.is-open td:first-child { box-shadow:inset 3px 0 0 var(--g); }
+    .subj { font-weight:600; max-width:260px; }
+    a.gm { color:inherit; text-decoration:none; }
+    a.gm:hover { color:var(--blue); text-decoration:underline; }
+    a.gm .ext { font-size:11px; color:var(--grey); }
     .recip { font-size:12px; color:var(--grey); }
     .status { font-weight:700; white-space:nowrap; }
-    .st-open { color:var(--g); } .st-sent { color:var(--grey); } .st-bounce { color:var(--red); }
+    .st-open{color:var(--g);} .st-sent{color:var(--grey);} .st-bounce{color:var(--red);}
+    .tl-btn { border:1px solid var(--line); background:none; color:var(--grey); border-radius:8px; padding:2px 9px; cursor:pointer; }
     .detail { background:rgba(128,128,128,.04); }
     .detail td { padding:0; }
-    .detail-inner { padding:16px 24px; }
+    .detail-inner { padding:14px 22px; }
     .tl { margin:0; padding:0; list-style:none; }
-    .tl li { padding:6px 0; font-size:13px; border-left:2px solid var(--line); padding-left:14px; margin-left:4px; position:relative; }
-    .tl li::before { content:''; position:absolute; left:-5px; top:12px; width:8px; height:8px; border-radius:50%; background:var(--g); }
-    .tl li.click::before { background:var(--blue); }
-    .tl li.proxy::before { background:#9aa0a6; }
+    .tl li { padding:5px 0; font-size:13px; border-left:2px solid var(--line); padding-left:14px; margin-left:4px; position:relative; }
+    .tl li::before { content:''; position:absolute; left:-5px; top:11px; width:8px; height:8px; border-radius:50%; background:var(--g); }
+    .tl li.click::before{background:var(--blue);} .tl li.proxy::before{background:#9aa0a6;}
     .empty { text-align:center; padding:50px; color:var(--grey); }
-    .badge-proxy { font-size:10px; background:#f1f3f4; color:#5f6368; padding:1px 6px; border-radius:6px; margin-left:6px; }
+
+    .badge { font-size:10px; padding:1px 7px; border-radius:7px; margin-left:5px; white-space:nowrap; display:inline-block; }
+    .badge-proxy { background:var(--chip); color:var(--grey); }
+    .badge-hot { background:rgba(227,116,0,.14); color:var(--amber); font-weight:700; }
+    .badge-reply { background:rgba(26,115,232,.14); color:var(--blue); font-weight:600; }
+    .badge-tag { background:rgba(30,142,62,.12); color:var(--g); cursor:pointer; }
+    .badge-sched { background:var(--chip); color:var(--grey); }
+    .tagcell { display:flex; flex-wrap:wrap; gap:3px; align-items:center; }
+    .tagadd { border:1px dashed var(--line); color:var(--grey); border-radius:7px; font-size:11px; padding:0 6px; cursor:pointer; background:none; }
+
+    /* Analytics */
+    .panel { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:18px 20px; margin-bottom:18px; }
+    .panel h2 { font-size:14px; margin:0 0 14px; }
+    .heat { display:grid; grid-template-columns:auto repeat(24, 1fr); gap:2px; font-size:10px; }
+    .heat .hc { aspect-ratio:1; border-radius:2px; background:rgba(var(--heat),.08); position:relative; }
+    .heat .lbl { color:var(--grey); display:flex; align-items:center; justify-content:flex-end; padding-right:4px; }
+    .heat .lbl.top { align-items:flex-end; justify-content:center; padding:0 0 2px; }
+    .two { display:grid; grid-template-columns:1fr 1fr; gap:18px; }
+    @media (max-width:720px){ .two{grid-template-columns:1fr;} }
+    .bar { display:flex; align-items:center; gap:8px; margin:5px 0; font-size:13px; }
+    .bar .lab { width:150px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--grey); }
+    .bar .track { flex:1; background:var(--chip); border-radius:6px; height:16px; overflow:hidden; }
+    .bar .fill { height:100%; background:var(--blue); border-radius:6px; }
+    .bar .val { width:120px; text-align:right; font-size:12px; color:var(--grey); }
+
+    .modal-bg { position:fixed; inset:0; background:rgba(0,0,0,.45); display:none; align-items:center; justify-content:center; z-index:20; padding:16px; }
+    .modal-bg.show { display:flex; }
+    .modal { background:var(--card); border-radius:16px; max-width:560px; width:100%; max-height:85vh; overflow:auto; padding:22px 24px; }
+    .modal h3 { margin:0 0 4px; }
+    .modal .sub { color:var(--grey); font-size:13px; margin-bottom:16px; }
+    .modal label { display:block; font-size:12px; color:var(--grey); margin:10px 0 4px; }
+    .modal input, .modal textarea { width:100%; padding:9px 11px; border:1px solid var(--line); border-radius:9px; background:var(--bg); color:var(--text); font:inherit; }
+    .modal .row { display:flex; gap:10px; justify-content:flex-end; margin-top:16px; }
+    .btn-primary { background:var(--blue); color:#fff; border:none; padding:9px 18px; border-radius:9px; cursor:pointer; font-size:14px; }
+    .btn-ghost { background:none; border:1px solid var(--line); color:var(--text); padding:9px 16px; border-radius:9px; cursor:pointer; }
+    .tmpl-item { display:flex; justify-content:space-between; align-items:center; padding:10px 0; border-bottom:1px solid var(--line); }
+    .hide { display:none !important; }
+
+    #toast { position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:#202124; color:#fff; padding:11px 20px; border-radius:30px; font-size:13px; box-shadow:0 4px 20px rgba(0,0,0,.3); opacity:0; transition:opacity .25s, transform .25s; z-index:30; pointer-events:none; }
+    #toast.show { opacity:1; transform:translateX(-50%) translateY(-4px); }
   </style>
 </head>
 <body>
   <header>
     <h1><span class="ticks">✓✓</span> Mail Tracker Dashboard</h1>
-    <button class="refresh" id="refresh">↻ Refresh</button>
+    <div class="hgroup">
+      <span class="live" id="live"><span class="dot"></span><span id="live-txt">connecting…</span></span>
+      <button class="btn" id="notif-btn" title="Turn on browser notifications">🔔 Alerts</button>
+      <button class="btn" id="csv-btn">⬇ CSV</button>
+      <button class="btn" id="refresh">↻ Refresh</button>
+    </div>
   </header>
 
   <div class="wrap">
-    <div class="cards">
-      <div class="card b"><div class="n" id="c-sent">0</div><div class="l">Bheji gayi</div></div>
-      <div class="card g"><div class="n" id="c-open">0</div><div class="l">Kholi gayi</div></div>
-      <div class="card"><div class="n" id="c-rate">0%</div><div class="l">Open rate</div></div>
-      <div class="card b"><div class="n" id="c-click">0</div><div class="l">Clicked</div></div>
-      <div class="card r"><div class="n" id="c-bounce">0</div><div class="l">Bounced</div></div>
+    <div class="tabs">
+      <div class="tab active" data-view="emails">📧 Emails</div>
+      <div class="tab" data-view="analytics">📊 Analytics</div>
+      <div class="tab" data-view="recipients">👤 Recipients</div>
+      <div class="tab" data-view="templates">📝 Templates</div>
     </div>
 
-    <div class="toolbar">
-      <input type="text" id="search" placeholder="🔍 subject, sender ya recipient se dhoondo…" />
-      <select id="sender"><option value="">Sab accounts</option></select>
-      <select id="filter">
-        <option value="all">Sab</option>
-        <option value="opened">Sirf kholi gayi</option>
-        <option value="unopened">Nahi kholi</option>
-        <option value="clicked">Click hui</option>
-        <option value="bounced">Bounced</option>
-      </select>
-    </div>
+    <!-- ===== EMAILS VIEW ===== -->
+    <section id="view-emails">
+      <div class="cards">
+        <div class="card b" data-filter="all"><div class="n" id="c-sent">0</div><div class="l">Sent</div></div>
+        <div class="card g" data-filter="opened"><div class="n" id="c-open">0</div><div class="l">Opened</div></div>
+        <div class="card" data-filter="all"><div class="n" id="c-rate">0%</div><div class="l">Open rate</div></div>
+        <div class="card b" data-filter="clicked"><div class="n" id="c-click">0</div><div class="l">Clicked</div></div>
+        <div class="card a" data-filter="replied"><div class="n" id="c-reply">0</div><div class="l">Replied</div></div>
+        <div class="card r" data-filter="bounced"><div class="n" id="c-bounce">0</div><div class="l">Bounced</div></div>
+      </div>
 
-    <table>
-      <thead>
-        <tr><th>Subject</th><th>From (kis se)</th><th>To (kisko)</th><th>Status</th><th>Opens</th><th>Clicks</th><th>Bheji</th></tr>
-      </thead>
-      <tbody id="tbody">
-        <tr><td colspan="7" class="empty">Load ho raha hai…</td></tr>
-      </tbody>
-    </table>
+      <div class="toolbar">
+        <input type="text" id="search" placeholder="🔍 Search by subject, sender, recipient or tag…" />
+        <select id="sender"><option value="">All accounts</option></select>
+        <select id="filter">
+          <option value="all">All status</option>
+          <option value="opened">Opened only</option>
+          <option value="unopened">Not opened</option>
+          <option value="clicked">Clicked</option>
+          <option value="replied">Replied</option>
+          <option value="noreply">No reply</option>
+          <option value="bounced">Bounced</option>
+        </select>
+        <select id="date">
+          <option value="all">Any time</option>
+          <option value="today">Today</option>
+          <option value="week">This week</option>
+          <option value="month">This month</option>
+        </select>
+        <select id="followup">
+          <option value="">Follow-up: off</option>
+          <option value="1">Not opened in 1 day</option>
+          <option value="2">Not opened in 2 days</option>
+          <option value="3">Not opened in 3 days</option>
+          <option value="7">Not opened in 7 days</option>
+        </select>
+      </div>
+
+      <table>
+        <thead>
+          <tr><th>Subject</th><th>From</th><th>To</th><th>Status</th><th>Opened</th><th>Opens</th><th>Clicks</th><th>Tags</th><th>Sent</th><th></th></tr>
+        </thead>
+        <tbody id="tbody"><tr><td colspan="10" class="empty">Loading…</td></tr></tbody>
+      </table>
+    </section>
+
+    <!-- ===== ANALYTICS VIEW ===== -->
+    <section id="view-analytics" class="hide">
+      <div class="panel">
+        <h2>When emails are opened most (day &amp; hour)</h2>
+        <div class="heat" id="heat"></div>
+        <p style="color:var(--grey);font-size:12px;margin:10px 0 0">Darker = more opens at that time. (Your local time.)</p>
+      </div>
+      <div class="two">
+        <div class="panel">
+          <h2>Open rate by domain <span style="color:var(--grey);font-weight:400">(which companies open most)</span></h2>
+          <div id="domain-stats"></div>
+        </div>
+        <div class="panel">
+          <h2>Open rate by template <span style="color:var(--grey);font-weight:400">(which subject works best)</span></h2>
+          <div id="template-stats"></div>
+        </div>
+      </div>
+      <div class="panel">
+        <h2>This week's summary</h2>
+        <div id="weekly"></div>
+      </div>
+    </section>
+
+    <!-- ===== RECIPIENTS VIEW ===== -->
+    <section id="view-recipients" class="hide">
+      <div class="toolbar"><input type="text" id="rsearch" placeholder="🔍 Search recipients…" /></div>
+      <table>
+        <thead><tr><th>Recipient</th><th>Sent</th><th>Opened</th><th>Open rate</th><th>Replied</th><th>Last activity</th></tr></thead>
+        <tbody id="rtbody"><tr><td colspan="6" class="empty">—</td></tr></tbody>
+      </table>
+    </section>
+
+    <!-- ===== TEMPLATES VIEW ===== -->
+    <section id="view-templates" class="hide">
+      <div class="toolbar"><button class="btn-primary" id="new-tmpl">+ New template</button></div>
+      <div class="panel" id="tmpl-list"></div>
+      <p style="color:var(--grey);font-size:13px">Templates can be loaded from the "⚙ More" button in the extension's compose window.</p>
+    </section>
   </div>
 
-  <!-- absolute path: /dashboard (bina slash) par relative src /dashboard.js ban jata tha -->
+  <!-- recipient profile modal -->
+  <div class="modal-bg" id="modal-bg">
+    <div class="modal" id="modal"></div>
+  </div>
+
+  <div id="toast"></div>
+
   <script src="/dashboard/dashboard.js"></script>
 </body>
 </html>

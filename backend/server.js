@@ -4,11 +4,18 @@
 // Endpoints:
 //   GET  /p/:id.png       -> tracking pixel (open log)
 //   GET  /r/:id?u=<url>    -> link redirect (click log -> asli url)
-//   POST /api/register     -> extension email register karti hai
+//   POST /api/register     -> the extension registers an email
 //   POST /api/delivered    -> delivered/bounced status
 //   GET  /api/emails       -> list + counts (?owner= &limit=)
-//   GET  /api/emails/:id   -> ek email ki detail
+//   GET  /api/emails/:id   -> details of one email
 //   GET  /api/stats        -> summary (?owner=)
+//   PATCH /api/emails/:id  -> tags / remind_days / replied / thread_id
+//   DELETE /api/emails/:id -> (localhost only)
+//   POST /api/replied      -> extension: reply mila
+//   GET  /api/opens        -> all opens, for the chart
+//   GET  /api/reminders/due-> follow-up reminders
+//   GET/POST/DELETE /api/templates
+//   GET  /api/events       -> live update (SSE)
 //   GET  /api/health
 //   /dashboard/*           -> static dashboard
 
@@ -29,26 +36,40 @@ const PIXEL = Buffer.from(
 
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.png': 'image/png', '.json': 'application/json' };
 
-// start.ps1 tunnel ka URL yahan likhta hai. Agar file nahi hai to PUBLIC_URL env,
-// warna khaali — us soorat mein extension localhost hi use karegi.
+// start.ps1 writes the tunnel URL here. If the file is missing, PUBLIC_URL env is used,
+// otherwise empty — in which case the extension just uses localhost.
 const PUBLIC_URL_FILE = path.join(__dirname, 'public-url.txt');
 function publicUrl() {
   try {
-    // ﻿ = BOM, agar file Windows se BOM ke sath likhi gayi ho
+    // ﻿ = BOM, in case the file was written with a BOM on Windows
     const v = fs.readFileSync(PUBLIC_URL_FILE, 'utf8').replace(/^﻿/, '').trim();
     if (v) return v.replace(/\/+$/, '');
   } catch {}
   return (process.env.PUBLIC_URL || '').replace(/\/+$/, '');
 }
 
-// Sender ne apni hi email kholi (extension batati hai) — us waqt ke aas paas ka
-// pixel hit "open" nahi hai. Pixel request extension ke message se pehle ya baad,
-// dono tarah aa sakti hai, is liye dono taraf window rakhte hain.
+// The sender opened their own email (the extension tells us) — a pixel hit around that
+// time is not a real "open". The pixel request can arrive either before or after the
+// extension's message, so we keep a window on both sides.
 const SELF_VIEW_WINDOW_MS = 30 * 1000;
 const selfViews = new Map(); // id -> last self-view time
 function recentSelfView(id, now) {
   const t = selfViews.get(id);
   return t != null && now - t < SELF_VIEW_WINDOW_MS;
+}
+
+// ---------- Live update (Server-Sent Events) ----------
+// Dashboard /api/events se juda rehta hai; open/click/nayi email par foran khabar.
+const sseClients = new Set();
+function broadcast(type, data) {
+  const msg = `event: ${type}\ndata: ${JSON.stringify(data || {})}\n\n`;
+  for (const res of sseClients) { try { res.write(msg); } catch (_) {} }
+}
+setInterval(() => { for (const res of sseClients) { try { res.write(': ping\n\n'); } catch (_) {} } }, 25000);
+
+// For subject comparison: "Re: Fwd: Hello" -> "hello"
+function normSubject(s) {
+  return String(s || '').toLowerCase().replace(/^\s*((re|fwd?|aw|sv)\s*:\s*)+/i, '').replace(/\s+/g, ' ').trim();
 }
 
 function looksLikeProxy(ua = '') {
@@ -62,7 +83,7 @@ function clientIp(req) {
 }
 function sendJson(res, code, obj) {
   const body = JSON.stringify(obj);
-  res.writeHead(code, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'Content-Type', 'Access-Control-Allow-Methods': 'GET,POST,OPTIONS' });
+  res.writeHead(code, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'Content-Type', 'Access-Control-Allow-Methods': 'GET,POST,PATCH,DELETE,OPTIONS' });
   res.end(body);
 }
 function readBody(req) {
@@ -80,7 +101,7 @@ const server = http.createServer(async (req, res) => {
 
   // CORS preflight
   if (method === 'OPTIONS') {
-    res.writeHead(204, { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'Content-Type', 'Access-Control-Allow-Methods': 'GET,POST,DELETE,OPTIONS' });
+    res.writeHead(204, { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'Content-Type', 'Access-Control-Allow-Methods': 'GET,POST,PATCH,DELETE,OPTIONS' });
     return res.end();
   }
 
@@ -96,6 +117,7 @@ const server = http.createServer(async (req, res) => {
         const isSelf = (since >= 0 && since < SELF_OPEN_GUARD_MS) || recentSelfView(id, now);
         if (!isSelf) {
           stmts.insertOpen.run(id, now, ua, clientIp(req), looksLikeProxy(ua) ? 1 : 0);
+          broadcast('open', { id, subject: email.subject, recipient: email.recipient, owner: email.owner });
         }
       }
     } catch (e) { console.error('pixel:', e.message); }
@@ -114,7 +136,11 @@ const server = http.createServer(async (req, res) => {
     try { const p = new URL(target); if (p.protocol === 'http:' || p.protocol === 'https:') safe = p.toString(); } catch {}
     if (!safe) { res.writeHead(400); return res.end('Invalid link'); }
     try {
-      if (stmts.getEmail.get(id)) stmts.insertClick.run(id, safe, Date.now(), req.headers['user-agent'] || '', clientIp(req));
+      const em = stmts.getEmail.get(id);
+      if (em) {
+        stmts.insertClick.run(id, safe, Date.now(), req.headers['user-agent'] || '', clientIp(req));
+        broadcast('click', { id, subject: em.subject, recipient: em.recipient, url: safe });
+      }
     } catch (e) { console.error('click:', e.message); }
     res.writeHead(302, { Location: safe });
     return res.end();
@@ -125,7 +151,11 @@ const server = http.createServer(async (req, res) => {
     const b = await readBody(req);
     if (!b.id) return sendJson(res, 400, { error: 'id required' });
     try {
-      stmts.insertEmail.run(b.id, b.owner || null, b.subject || '(no subject)', b.recipient || null, Date.now());
+      const tags = String(b.tags || '').split(',').map((t) => t.trim()).filter(Boolean).slice(0, 10).join(', ') || null;
+      const rd = Number(b.remind_days);
+      stmts.insertEmail.run(b.id, b.owner || null, b.subject || '(no subject)', b.recipient || null, Date.now(),
+        b.scheduled ? 1 : 0, tags, b.template ? String(b.template).slice(0, 100) : null, rd > 0 ? Date.now() + rd * 86400000 : null);
+      broadcast('register', { id: b.id });
       return sendJson(res, 200, { ok: true, id: b.id });
     } catch (e) {
       if (String(e.message).includes('UNIQUE')) return sendJson(res, 200, { ok: true, id: b.id, note: 'already' });
@@ -146,18 +176,107 @@ const server = http.createServer(async (req, res) => {
     if (!b.id) return sendJson(res, 400, { error: 'id required' });
     const now = Date.now();
     selfViews.set(b.id, now);
-    // agar pixel hit pehle aa chuka tha to wo open hata do
-    try { stmts.deleteRecentOpens.run(b.id, now - SELF_VIEW_WINDOW_MS); } catch (e) { console.error('selfview:', e.message); }
+    // if a pixel hit already arrived, remove that open
+    try {
+      const r = stmts.deleteRecentOpens.run(b.id, now - SELF_VIEW_WINDOW_MS);
+      if (r && r.changes) broadcast('update', { id: b.id });
+    } catch (e) { console.error('selfview:', e.message); }
     return sendJson(res, 200, { ok: true });
   }
 
-  // Email (aur us ke opens/clicks) delete — sirf localhost se (tunnel se nahi)
+  // Delete an email (and its opens/clicks) — from localhost only (not the tunnel)
   if (pathn.startsWith('/api/emails/') && method === 'DELETE') {
     const fromTunnel = !!(req.headers['cf-connecting-ip'] || req.headers['x-forwarded-for']);
-    if (fromTunnel) return sendJson(res, 403, { error: 'sirf localhost se' });
+    if (fromTunnel) return sendJson(res, 403, { error: 'localhost only' });
     const id = decodeURIComponent(pathn.slice('/api/emails/'.length));
-    try { stmts.deleteOpens.run(id); stmts.deleteClicks.run(id); stmts.deleteEmail.run(id); return sendJson(res, 200, { ok: true }); }
+    try { stmts.deleteOpens.run(id); stmts.deleteClicks.run(id); stmts.deleteEmail.run(id); broadcast('update', { id }); return sendJson(res, 200, { ok: true }); }
     catch (e) { return sendJson(res, 500, { error: e.message }); }
+  }
+
+  // Tags / reminder / reply status badlo (dashboard se)
+  if (pathn.startsWith('/api/emails/') && method === 'PATCH') {
+    const id = decodeURIComponent(pathn.slice('/api/emails/'.length));
+    const b = await readBody(req);
+    try {
+      if (!stmts.getEmail.get(id)) return sendJson(res, 404, { error: 'not found' });
+      if (b.tags !== undefined) {
+        const tags = String(b.tags || '').split(',').map((t) => t.trim()).filter(Boolean).slice(0, 10).join(', ');
+        stmts.setTags.run(tags || null, id);
+      }
+      if (b.remind_days !== undefined) {
+        const d = Number(b.remind_days);
+        stmts.setRemind.run(d > 0 ? Date.now() + d * 86400000 : null, id);
+      }
+      if (b.replied !== undefined) stmts.setReplied.run(b.replied ? 1 : 0, b.replied ? Date.now() : null, id);
+      if (b.thread_id) stmts.setThread.run(String(b.thread_id).slice(0, 100), id);
+      broadcast('update', { id });
+      return sendJson(res, 200, { ok: true, email: stmts.getEmail.get(id) });
+    } catch (e) { return sendJson(res, 500, { error: e.message }); }
+  }
+
+  // The extension sees "Re: <subject>" in the inbox and reports it here
+  if (pathn === '/api/replied' && method === 'POST') {
+    const b = await readBody(req);
+    const from = String(b.from || '').toLowerCase().trim();
+    const subj = normSubject(b.subject);
+    if (!from || !subj) return sendJson(res, 400, { error: 'from + subject required' });
+    try {
+      const cands = stmts.replyCandidates.all(`%${from}%`);
+      const hit = cands.find((c) => normSubject(c.subject) === subj && (!b.owner || !c.owner || c.owner === b.owner));
+      if (!hit) return sendJson(res, 200, { ok: true, matched: false });
+      stmts.setReplied.run(1, Date.now(), hit.id);
+      broadcast('replied', { id: hit.id, subject: hit.subject, recipient: hit.recipient });
+      return sendJson(res, 200, { ok: true, matched: true, id: hit.id });
+    } catch (e) { return sendJson(res, 500, { error: e.message }); }
+  }
+
+  // Templates
+  if (pathn === '/api/templates' && method === 'GET') {
+    try { return sendJson(res, 200, { templates: stmts.listTemplates.all() }); }
+    catch (e) { return sendJson(res, 500, { error: e.message }); }
+  }
+  if (pathn === '/api/templates' && method === 'POST') {
+    const b = await readBody(req);
+    const name = String(b.name || '').trim().slice(0, 100);
+    if (!name) return sendJson(res, 400, { error: 'name required' });
+    try {
+      stmts.insertTemplate.run(name, String(b.subject || '').slice(0, 300), String(b.body || '').slice(0, 50000), Date.now());
+      broadcast('templates', {});
+      return sendJson(res, 200, { ok: true });
+    } catch (e) { return sendJson(res, 500, { error: e.message }); }
+  }
+  if (pathn.startsWith('/api/templates/') && method === 'DELETE') {
+    const id = Number(pathn.slice('/api/templates/'.length));
+    try { stmts.deleteTemplate.run(id); broadcast('templates', {}); return sendJson(res, 200, { ok: true }); }
+    catch (e) { return sendJson(res, 500, { error: e.message }); }
+  }
+
+  // All opens — for the chart (day/hour)
+  if (pathn === '/api/opens' && method === 'GET') {
+    try { return sendJson(res, 200, { opens: stmts.allOpens.all() }); }
+    catch (e) { return sendJson(res, 500, { error: e.message }); }
+  }
+
+  // Follow-up reminders that are now due (and the email is still unopened)
+  if (pathn === '/api/reminders/due' && method === 'GET') {
+    try {
+      const due = stmts.dueReminders.all(Date.now());
+      due.forEach((e) => stmts.markReminded.run(e.id));
+      if (due.length) broadcast('reminder', { emails: due.map((e) => ({ id: e.id, subject: e.subject, recipient: e.recipient })) });
+      return sendJson(res, 200, { emails: due });
+    } catch (e) { return sendJson(res, 500, { error: e.message }); }
+  }
+
+  // Live update stream
+  if (pathn === '/api/events' && method === 'GET') {
+    res.writeHead(200, {
+      'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache, no-transform',
+      'Connection': 'keep-alive', 'Access-Control-Allow-Origin': '*', 'X-Accel-Buffering': 'no',
+    });
+    res.write('retry: 5000\n\n');
+    sseClients.add(res);
+    req.on('close', () => sseClients.delete(res));
+    return;
   }
 
   if (pathn === '/api/delivered' && method === 'POST') {
@@ -198,9 +317,9 @@ const server = http.createServer(async (req, res) => {
     } catch (e) { return sendJson(res, 500, { error: e.message }); }
   }
 
-  // Public URL — pixel aur link tracking ke liye. Extension ye yahan se puchti hai,
-  // taake tunnel restart hone par options mein haath lagane ki zaroorat na pade.
-  // File har request par fresh padhi jati hai, is liye server restart bhi nahi chahiye.
+  // Public URL — for pixel and link tracking. The extension asks for it here,
+  // so there's no need to touch the options when the tunnel restarts.
+  // The file is read fresh on every request, so a server restart isn't needed either.
   if (pathn === '/api/config' && method === 'GET') {
     return sendJson(res, 200, { publicUrl: publicUrl() });
   }
@@ -218,7 +337,7 @@ const server = http.createServer(async (req, res) => {
 
   if (pathn === '/') {
     res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-    return res.end('<h2>Email Tracker backend chal raha hai ✓</h2><p><a href="/dashboard">Dashboard kholo</a></p>');
+    return res.end('<h2>Email Tracker backend is running ✓</h2><p><a href="/dashboard">Open dashboard</a></p>');
   }
 
   res.writeHead(404, { 'Content-Type': 'text/plain' });

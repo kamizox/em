@@ -1,4 +1,4 @@
-/* content.css — compose chip aur sent-list badge ka style */
+/* content.css — styles for the compose chip and sent-list badge */
 
 .mt-chip {
   display: inline-flex;
@@ -36,7 +36,7 @@
 .mt-badge.mt-opened  { color: #1e8e3e; }   /* green ✓✓ */
 .mt-badge.mt-bounced { color: #d93025; }   /* red ⚠    */
 
-/* send ke waqt confirmation toast */
+/* confirmation toast shown at send time */
 .mt-toast {
   position: fixed;
   left: 24px;
@@ -53,3 +53,28 @@
 }
 .mt-toast-err { background: #d93025; color: #fff; }
 @keyframes mt-toast-in { from { opacity: 0; transform: translateY(8px); } }
+
+/* ===== v2 features: options popover, opened-email status bar ===== */
+.mt-chip-opt { background:#f1f3f4; }
+.mt-pop {
+  position: fixed; z-index: 2147483647; width: 260px;
+  background: #fff; color: #202124; border: 1px solid #dadce0; border-radius: 12px;
+  box-shadow: 0 8px 28px rgba(0,0,0,.25); padding: 14px; font: 13px/1.4 'Google Sans', Roboto, Arial, sans-serif;
+}
+.mt-pop-row { margin-bottom: 10px; }
+.mt-pop label { display:block; font-size:11px; color:#5f6368; margin-bottom:4px; }
+.mt-pop .mt-in { width:100%; box-sizing:border-box; padding:7px 9px; border:1px solid #dadce0; border-radius:8px; font:inherit; background:#fff; color:#202124; }
+.mt-pop-foot { text-align:right; }
+.mt-btn { background:#1a73e8; color:#fff; border:none; padding:7px 16px; border-radius:8px; cursor:pointer; font:500 13px 'Google Sans',Roboto,Arial; }
+
+.mt-statusbar {
+  margin: 6px 0 10px; padding: 8px 14px; border-radius: 10px;
+  background: #e6f4ea; color: #137333; font: 500 13px/1.4 'Google Sans', Roboto, Arial, sans-serif;
+  border: 1px solid #ceead6; display: inline-block;
+}
+
+@media (prefers-color-scheme: dark) {
+  .mt-pop { background:#2a2b2f; color:#e8eaed; border-color:#5f6368; }
+  .mt-pop .mt-in { background:#202124; color:#e8eaed; border-color:#5f6368; }
+  .mt-statusbar { background:rgba(129,201,149,.15); color:#81c995; border-color:#3c4043; }
+}
